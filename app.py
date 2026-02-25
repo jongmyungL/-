@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from html import unescape
 from io import BytesIO
@@ -199,23 +200,46 @@ def get_naver_credentials() -> Tuple[str, str]:
 
     # 2) Streamlit Secrets (루트 키 또는 섹션형 모두 지원)
     try:
+        secrets_dict = {}
+        if hasattr(st.secrets, "to_dict"):
+            secrets_dict = st.secrets.to_dict()
+
         root_id = _clean_secret_value(
-            st.secrets.get("NAVER_CLIENT_ID", "") or st.secrets.get("naver_client_id", "")
+            st.secrets.get("NAVER_CLIENT_ID", "")
+            or st.secrets.get("naver_client_id", "")
+            or secrets_dict.get("NAVER_CLIENT_ID", "")
+            or secrets_dict.get("naver_client_id", "")
         )
         root_secret = _clean_secret_value(
-            st.secrets.get("NAVER_CLIENT_SECRET", "") or st.secrets.get("naver_client_secret", "")
+            st.secrets.get("NAVER_CLIENT_SECRET", "")
+            or st.secrets.get("naver_client_secret", "")
+            or secrets_dict.get("NAVER_CLIENT_SECRET", "")
+            or secrets_dict.get("naver_client_secret", "")
         )
         if root_id and root_secret:
             return root_id, root_secret
 
         for section_name in ["naver", "NAVER", "api", "credentials"]:
-            section = st.secrets.get(section_name, {})
-            if isinstance(section, dict):
+            section = st.secrets.get(section_name, None)
+            section_dict = {}
+
+            if isinstance(section, Mapping):
+                section_dict = dict(section)
+            elif hasattr(section, "to_dict"):
+                section_dict = section.to_dict()
+            elif section_name in secrets_dict and isinstance(secrets_dict.get(section_name), Mapping):
+                section_dict = dict(secrets_dict.get(section_name, {}))
+
+            if section_dict:
                 sec_id = _clean_secret_value(
-                    section.get("NAVER_CLIENT_ID", "") or section.get("client_id", "")
+                    section_dict.get("NAVER_CLIENT_ID", "")
+                    or section_dict.get("naver_client_id", "")
+                    or section_dict.get("client_id", "")
                 )
                 sec_secret = _clean_secret_value(
-                    section.get("NAVER_CLIENT_SECRET", "") or section.get("client_secret", "")
+                    section_dict.get("NAVER_CLIENT_SECRET", "")
+                    or section_dict.get("naver_client_secret", "")
+                    or section_dict.get("client_secret", "")
                 )
                 if sec_id and sec_secret:
                     return sec_id, sec_secret
@@ -415,8 +439,15 @@ def draw_sidebar() -> str:
         st.sidebar.success("네이버 API 키가 설정되어 있습니다.")
     else:
         st.sidebar.warning(
-            "네이버 API 키가 아직 없습니다.\n`.env`에 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET를 설정하세요."
+            "네이버 API 키를 찾지 못했습니다.\n로컬은 `.env`, 배포는 Streamlit `Secrets`를 확인하세요."
         )
+
+    if st.sidebar.button("API 키 인식 상태 점검"):
+        cid, csec = get_naver_credentials()
+        if cid and csec:
+            st.sidebar.success("API 키 인식 성공")
+        else:
+            st.sidebar.error("API 키 인식 실패 (키 이름/배포 재시작 여부 확인 필요)")
 
     if st.sidebar.button("지금 뉴스 수집 실행"):
         added_count, source = collect_news_from_naver()
