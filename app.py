@@ -184,10 +184,49 @@ def refresh_alerts() -> None:
     st.session_state.alerts = sorted(items, key=lambda x: x["time"], reverse=True)
 
 
-def naver_api_ready() -> bool:
+def _clean_secret_value(value: str) -> str:
+    return str(value).strip().strip('"').strip("'")
+
+
+def get_naver_credentials() -> Tuple[str, str]:
     load_dotenv()
-    client_id = os.getenv("NAVER_CLIENT_ID", "") or st.secrets.get("NAVER_CLIENT_ID", "")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET", "") or st.secrets.get("NAVER_CLIENT_SECRET", "")
+
+    # 1) 환경변수(.env)
+    env_client_id = _clean_secret_value(os.getenv("NAVER_CLIENT_ID", ""))
+    env_client_secret = _clean_secret_value(os.getenv("NAVER_CLIENT_SECRET", ""))
+    if env_client_id and env_client_secret:
+        return env_client_id, env_client_secret
+
+    # 2) Streamlit Secrets (루트 키 또는 섹션형 모두 지원)
+    try:
+        root_id = _clean_secret_value(
+            st.secrets.get("NAVER_CLIENT_ID", "") or st.secrets.get("naver_client_id", "")
+        )
+        root_secret = _clean_secret_value(
+            st.secrets.get("NAVER_CLIENT_SECRET", "") or st.secrets.get("naver_client_secret", "")
+        )
+        if root_id and root_secret:
+            return root_id, root_secret
+
+        for section_name in ["naver", "NAVER", "api", "credentials"]:
+            section = st.secrets.get(section_name, {})
+            if isinstance(section, dict):
+                sec_id = _clean_secret_value(
+                    section.get("NAVER_CLIENT_ID", "") or section.get("client_id", "")
+                )
+                sec_secret = _clean_secret_value(
+                    section.get("NAVER_CLIENT_SECRET", "") or section.get("client_secret", "")
+                )
+                if sec_id and sec_secret:
+                    return sec_id, sec_secret
+    except Exception:
+        pass
+
+    return "", ""
+
+
+def naver_api_ready() -> bool:
+    client_id, client_secret = get_naver_credentials()
     return bool(client_id and client_secret)
 
 
@@ -239,9 +278,7 @@ def normalize_press_name(raw_press: str, link: str) -> str:
 
 
 def collect_news_from_naver() -> Tuple[int, str]:
-    load_dotenv()
-    client_id = os.getenv("NAVER_CLIENT_ID", "") or st.secrets.get("NAVER_CLIENT_ID", "")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET", "") or st.secrets.get("NAVER_CLIENT_SECRET", "")
+    client_id, client_secret = get_naver_credentials()
 
     if not (client_id and client_secret):
         return 0, "no_key"
