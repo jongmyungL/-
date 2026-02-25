@@ -186,8 +186,8 @@ def refresh_alerts() -> None:
 
 def naver_api_ready() -> bool:
     load_dotenv()
-    client_id = os.getenv("NAVER_CLIENT_ID", "")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+    client_id = os.getenv("NAVER_CLIENT_ID", "") or st.secrets.get("NAVER_CLIENT_ID", "")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET", "") or st.secrets.get("NAVER_CLIENT_SECRET", "")
     return bool(client_id and client_secret)
 
 
@@ -240,8 +240,8 @@ def normalize_press_name(raw_press: str, link: str) -> str:
 
 def collect_news_from_naver() -> Tuple[int, str]:
     load_dotenv()
-    client_id = os.getenv("NAVER_CLIENT_ID", "")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+    client_id = os.getenv("NAVER_CLIENT_ID", "") or st.secrets.get("NAVER_CLIENT_ID", "")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET", "") or st.secrets.get("NAVER_CLIENT_SECRET", "")
 
     if not (client_id and client_secret):
         return 0, "no_key"
